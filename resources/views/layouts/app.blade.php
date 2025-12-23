@@ -12,7 +12,17 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-        {{-- KODE SERVICE WORKER DAN MANIFEST DIHAPUS UNTUK MENGATASI MASALAH CACHING CSS/NAVIGASI --}}
+        <link rel="manifest" href="{{ asset('manifest.json') }}">
+
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then((reg) => console.log('Service Worker: Terdaftar!', reg.scope))
+                .catch((err) => console.log('Service Worker: Gagal daftar.', err));
+        });
+    }
+</script>
     </head>
     <body class="font-sans antialiased">
         <div class="min-h-screen bg-gray-100 dark:bg-gray-900">

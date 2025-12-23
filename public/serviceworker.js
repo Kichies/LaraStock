@@ -1,34 +1,47 @@
-const CACHE_NAME = 'inventaris-uas-v2'; // Ganti versi cache agar browser menginstal ulang
-    
-// Daftar halaman wajib
+const CACHE_NAME = 'inventaris-uas-v3'; // Saya naikkan versinya ke v3 biar fresh
 const CORE_URLS = [
     '/',
     '/login',
-    '/products', // Akses halaman produk setelah login
+    '/products',
 ];
 
-// Fungsi untuk mendapatkan semua aset dari manifest Vite
+// Fungsi untuk mendapatkan aset (DENGAN PENGAMAN ERROR)
 async function getViteAssets() {
-    // Membaca manifest yang dibuat oleh NPM RUN BUILD
-    const response = await fetch('/build/manifest.json');
-    const manifest = await response.json();
-    
-    // Mengekstrak path asset yang benar (sudah di-hash)
-    const assetPaths = Object.values(manifest).map(entry => '/build/' + entry.file);
-    
-    return [...CORE_URLS, ...assetPaths];
+    try {
+        // Coba ambil manifest build
+        const response = await fetch('/build/manifest.json');
+        
+        // Jika file tidak ada (misal mode dev atau belum build), lempar error
+        if (!response.ok) {
+            throw new Error('Manifest build belum tersedia (Mode Dev)');
+        }
+
+        const manifest = await response.json();
+        const assetPaths = Object.values(manifest).map(entry => '/build/' + entry.file);
+        
+        // Jika sukses, gabungkan URL Inti + Aset Build
+        return [...CORE_URLS, ...assetPaths];
+
+    } catch (error) {
+        // INI PERBAIKANNYA:
+        // Jika gagal (lagi ngoding di localhost), jangan error.
+        // Cukup kembalikan halaman inti saja supaya PWA tetap jalan.
+        console.warn('PWA berjalan di mode Dev. Hanya meng-cache halaman inti.');
+        return CORE_URLS; 
+    }
 }
 
-// Install event - Caching assets
+// Install event
 self.addEventListener('install', event => {
+    // Paksa SW baru untuk segera aktif tanpa menunggu tab ditutup
+    self.skipWaiting();
+
     event.waitUntil(
         getViteAssets().then(urlsToCache => {
             return caches.open(CACHE_NAME).then(cache => {
                 console.log('Opened cache. Caching ' + urlsToCache.length + ' assets.');
-                return cache.addAll(urlsToCache); // Cache semua aset yang benar
+                return cache.addAll(urlsToCache);
             });
-        }).catch(error => {
-             console.error('Failed to cache assets:', error);
         })
     );
 });
