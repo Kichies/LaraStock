@@ -1,6 +1,6 @@
 {
-  "name": "Sistem Inventaris UAS",
-  "short_name": "InvUAS",
+  "name": "LaraStock - Sistem Inventaris",
+  "short_name": "LaraStock",
   "description": "Aplikasi Manajemen Stok Berbasis Web PWA",
   "start_url": "/login", 
   "background_color": "#ffffff",
