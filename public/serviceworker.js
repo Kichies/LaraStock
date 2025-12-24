@@ -1,41 +1,29 @@
-const CACHE_NAME = 'inventaris-uas-v3'; // Saya naikkan versinya ke v3 biar fresh
+const CACHE_NAME = 'inventaris-uas-v4'; // Saya naikkan ke v4 biar browser sadar ada update
 const CORE_URLS = [
     '/',
     '/login',
     '/products',
 ];
 
-// Fungsi untuk mendapatkan aset (DENGAN PENGAMAN ERROR)
+// --- BAGIAN INI TIDAK SAYA UBAH (TETAP SAMA) ---
 async function getViteAssets() {
     try {
-        // Coba ambil manifest build
         const response = await fetch('/build/manifest.json');
-        
-        // Jika file tidak ada (misal mode dev atau belum build), lempar error
         if (!response.ok) {
             throw new Error('Manifest build belum tersedia (Mode Dev)');
         }
-
         const manifest = await response.json();
         const assetPaths = Object.values(manifest).map(entry => '/build/' + entry.file);
-        
-        // Jika sukses, gabungkan URL Inti + Aset Build
         return [...CORE_URLS, ...assetPaths];
-
     } catch (error) {
-        // INI PERBAIKANNYA:
-        // Jika gagal (lagi ngoding di localhost), jangan error.
-        // Cukup kembalikan halaman inti saja supaya PWA tetap jalan.
         console.warn('PWA berjalan di mode Dev. Hanya meng-cache halaman inti.');
         return CORE_URLS; 
     }
 }
 
-// Install event
+// --- BAGIAN INSTALL & ACTIVATE TIDAK SAYA UBAH ---
 self.addEventListener('install', event => {
-    // Paksa SW baru untuk segera aktif tanpa menunggu tab ditutup
     self.skipWaiting();
-
     event.waitUntil(
         getViteAssets().then(urlsToCache => {
             return caches.open(CACHE_NAME).then(cache => {
@@ -46,7 +34,6 @@ self.addEventListener('install', event => {
     );
 });
 
-// Activate event - Menghapus cache lama
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => {
@@ -61,14 +48,29 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Fetch event - Strategy Cache First
+// --- BAGIAN INI YANG SAYA PERBAIKI (SOLUSI DARI ERROR TADI) ---
+// Strategi diubah jadi: Network First (Cek Internet dulu -> Baru Cache)
+// Ini aman untuk Laravel supaya data tidak nyangkut/error.
 self.addEventListener('fetch', event => {
     event.respondWith(
-        caches.match(event.request).then(response => {
-            if (response) {
+        fetch(event.request)
+            .then(response => {
+                // 1. Kalau Internet Lancar: Kembalikan respon asli
+                // Dan simpan salinannya ke cache (update cache otomatis)
+                if (!response || response.status !== 200 || response.type !== 'basic') {
+                    return response;
+                }
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME)
+                    .then(cache => {
+                        cache.put(event.request, responseToCache);
+                    });
                 return response;
-            }
-            return fetch(event.request);
-        })
+            })
+            .catch(() => {
+                // 2. Kalau Internet Mati (OFFLINE): Baru ambil dari Cache
+                // Ini mencegah error saat reload page
+                return caches.match(event.request);
+            })
     );
 });
